@@ -1,4 +1,5 @@
 from collections import UserDict
+import datetime
 
 class Field:
     def __init__(self, value):
@@ -29,7 +30,7 @@ class Birthday(Field):
 
     def validate(self):
         try:
-            datetime.strptime(self.value, "%d.%m.%Y")
+            datetime.datetime.strptime(self.value, "%d.%m.%Y")
             return True
         except ValueError:
             return False
@@ -56,8 +57,11 @@ class Record:
     def find_phone(self, phone_number):
         return next((phone for phone in self.phones if phone.value == phone_number), None)
 
-    def add_birthday(self, birthday_str):
-        self.birthday = Birthday(birthday_str)
+    def add_birthday(self, birthday):
+        self.birthday = Birthday(birthday)
+        if not self.birthday.validate():
+            self.birthday = None
+        return "Invalid date format. Please use 'dd.mm.yyyy'"
 
     def days_to_birthday(self):
         if not self.birthday:
@@ -87,7 +91,44 @@ class AddressBook(UserDict):
 
     def delete(self, name):
         del self.data[name]
+    
+    def change_phone(self, name, new_phone):
+        record = self.data.get(name)
+        if record:
+            record.edit_phone(record.find_phone().value, new_phone)
 
+    def show_phone(self, name):
+        record = self.data.get(name)
+        if record:
+            return '; '.join(phone.value for phone in record.phones)
+
+    def show_all(self):
+        return '\n'.join(str(record) for record in self.data.values())
+
+def add_handler(args):
+    if len(args) != 3:
+        return "Invalid command usage: add <name> <phone>"
+    name, phone = args[1:]
+    record = Record(name)
+    record.add_phone(phone)
+    book.add_record(record)
+    return f"Contact {name} added"
+
+def change_handler(args):
+    if len(args) != 3:
+        return "Invalid command usage: change <name> <new_phone>"
+    name, new_phone = args[1:]
+    book.change_phone(name, new_phone)
+    return f"Phone number for {name} changed"
+
+def phone_handler(args):
+    if len(args) != 2:
+        return "Invalid command usage: phone <name>"
+    name = args[1]
+    return book.show_phone(name) or f"Contact {name} not found"
+
+def all_handler(args):
+    return book.show_all()
 
 def add_birthday_handler(args):
     if len(args) != 3:
@@ -121,3 +162,32 @@ def show_birthdays_next_week_handler(args):
                 birthdays.append(contact)
     return (f"Upcoming birthdays within the next week:\n")
 
+def hello_handler(args):
+    return "Hello, how can I assist you today?"
+
+def close_handler(args):
+    exit(0)
+
+
+handlers = {
+    'add': add_handler,
+    'change': change_handler,
+    'phone': phone_handler,
+    'all': all_handler,
+    'add-birthday': add_birthday_handler,
+    'show-birthday': show_birthday_handler,
+    'birthdays': show_birthdays_next_week_handler,
+    'hello': hello_handler,
+    'close': close_handler,
+    'exit': close_handler,
+}
+
+book = AddressBook()
+
+while True:
+    command = input().split()
+    handler = handlers.get(command[0])
+    if handler:
+        print(handler(command))
+    else:
+        print("Unknown command")
