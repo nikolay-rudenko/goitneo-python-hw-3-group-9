@@ -21,20 +21,17 @@ class Phone(Field):
     def validate(self):
         return len(self.value) == 10 and self.value.isdigit()
 
-
 class Birthday(Field):
     def __init__(self, date_string):
-        super().__init__(date_string)
-        if not self.validate():
+        self.value = self.validate(date_string)
+        if not self.value:
             raise ValueError("Invalid birthday format. Use DD.MM.YYYY")
 
-    def validate(self):
+    def validate(self, date_string):
         try:
-            datetime.datetime.strptime(self.value, "%d.%m.%Y")
-            return True
+            return datetime.datetime.strptime(date_string, "%d.%m.%Y")
         except ValueError:
-            return False
-
+            return None
 
 class Record:
     def __init__(self, name):
@@ -58,10 +55,8 @@ class Record:
         return next((phone for phone in self.phones if phone.value == phone_number), None)
 
     def add_birthday(self, birthday):
-        self.birthday = Birthday(birthday)
-        if not self.birthday.validate():
-            self.birthday = None
-        return "Invalid date format. Please use 'dd.mm.yyyy'"
+        self.birthday = birthday
+        return True
 
     def days_to_birthday(self):
         if not self.birthday:
@@ -94,8 +89,9 @@ class AddressBook(UserDict):
     
     def change_phone(self, name, new_phone):
         record = self.data.get(name)
-        if record:
-            record.edit_phone(record.find_phone().value, new_phone)
+        if record and record.phones:
+            old_phone = record.phones[0].value
+            record.edit_phone(old_phone, new_phone)
 
     def show_phone(self, name):
         record = self.data.get(name)
@@ -136,7 +132,8 @@ def add_birthday_handler(args):
     name, birthday = args[1:]
     contact = book.find(name)
     if contact:
-        contact.add_birthday(birthday)
+        birthday_obj = Birthday(birthday)
+        contact.add_birthday(birthday_obj)
         return f"Birthday added for {name}"
     else:
         return f"Contact {name} not found"
@@ -155,12 +152,18 @@ def show_birthdays_next_week_handler(args):
     today = datetime.date.today()
     next_week = today + datetime.timedelta(days=7)
     birthdays = []
+
     for contact in book.values():
         if contact.birthday:
-            birthday_date = datetime.date(contact.birthday.year, contact.birthday.month, contact.birthday.day)
-            if birthday_date >= today and birthday_date <= next_week:
+            birthday_date = datetime.date(contact.birthday.value.year, contact.birthday.value.month, contact.birthday.value.day)
+            if (birthday_date.day, birthday_date.month) >= (today.day, today.month) and (birthday_date.day, birthday_date.month) <= (next_week.day, next_week.month):
                 birthdays.append(contact)
-    return (f"Upcoming birthdays within the next week:\n")
+    if birthdays:
+        for birthday in birthdays:
+            print(f"Upcoming birthdays within the next week:\n {birthday}")
+    else: 'No birthdays within the next week.'
+
+    return ''
 
 def hello_handler(args):
     return "Hello, how can I assist you today?"
